@@ -57,7 +57,7 @@ export default function Home() {
           type="text"
           value={title}
           onChange={(e) => setTitle(e.target.value)}
-          placeholder="할 일을 입력하세요"
+          placeholder="할 일을 입력하세요!"
           style={{ flex: 1, padding: '10px 12px', fontSize: 16, borderRadius: 6, border: '1px solid #ccc' }}
         />
         <button onClick={addTodo} style={{ padding: '10px 20px', background: '#0070f3', color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer' }}>
