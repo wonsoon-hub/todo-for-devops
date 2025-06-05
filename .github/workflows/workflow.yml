@@ -1,4 +1,4 @@
-# .github/workflows/main.yml
+# .github/workflows/workflow.yml
 name: Todo App CI/CD Pipeline
 
 on:
@@ -115,7 +115,11 @@ jobs:
           EOL
           
             echo '📦 Installing dependencies...'
-            npm ci
+            # 메모리 부족 방지를 위한 옵션 추가
+            npm ci --prefer-offline --no-audit --no-fund --quiet || {
+              echo '⚠️ npm ci failed, trying with reduced memory usage...'
+              npm install --production --no-optional --no-audit --no-fund --quiet
+            }
           
             echo '🗄️ Setting up database...'
             if [ -f 'prisma/schema.prisma' ]; then
@@ -132,6 +136,14 @@ jobs:
             echo '🚀 Starting application...'
             pm2 start npm --name todo-app -- start
             pm2 save
+          
+            echo '🔍 Checking application status...'
+            sleep 10
+            pm2 status
+            pm2 logs todo-app --lines 20
+          
+            echo '🧪 Testing local connection...'
+            curl -f http://localhost:3000 || echo 'Local connection failed'
           
             echo '🔧 Configuring Nginx proxy...'
             sudo tee /etc/nginx/sites-available/todo-app << 'NGINX_EOF'
@@ -160,17 +172,44 @@ jobs:
             echo '✅ Deployment completed!'
           "
 
-      - name: 🏥 Health check
+      - name: 🏥 Health check and diagnostics
         if: github.ref == 'refs/heads/main'
         run: |
           echo "⏳ Waiting for application to start..."
           sleep 30
           
-          echo "🔍 Checking application health..."
+          echo "🔍 Running detailed diagnostics..."
+          
+          # PM2 상태 확인
+          ssh azureuser@${{ secrets.VM_HOST }} "
+            echo '📊 PM2 Status:'
+            pm2 status
+          
+            echo '📋 PM2 Logs (last 20 lines):'
+            pm2 logs todo-app --lines 20 || echo 'No logs available'
+          
+            echo '🔌 Port 3000 check:'
+            sudo netstat -tlnp | grep 3000 || echo 'Port 3000 not in use'
+          
+            echo '🧪 Local curl test:'
+            curl -v http://localhost:3000 || echo 'Local connection failed'
+          
+            echo '📁 App directory contents:'
+            ls -la /home/azureuser/app/
+          
+            echo '⚙️ Environment file:'
+            cat /home/azureuser/app/.env.local || echo 'No .env.local file'
+          
+            echo '🔧 Nginx status:'
+            sudo systemctl status nginx --no-pager -l
+          "
+          
+          echo "🌐 External health check..."
           if curl -f -s http://${{ secrets.VM_HOST }}; then
             echo "✅ Application is healthy!"
           else
-            echo "❌ Health check failed!"
+            echo "❌ External health check failed!"
+            echo "ℹ️  Check the diagnostics above for details"
             exit 1
           fi
 
