@@ -176,7 +176,7 @@ jobs:
         if: github.ref == 'refs/heads/main'
         run: |
           echo "⏳ Waiting for application to start..."
-          sleep 30
+          sleep 60  # 1분으로 늘림
           
           echo "🔍 Running detailed diagnostics..."
           
@@ -185,33 +185,35 @@ jobs:
             echo '📊 PM2 Status:'
             pm2 status
           
-            echo '📋 PM2 Logs (last 20 lines):'
-            pm2 logs todo-app --lines 20 || echo 'No logs available'
+            echo '📋 PM2 Logs (last 10 lines):'
+            pm2 logs todo-app --lines 10 || echo 'No logs available'
           
             echo '🔌 Port 3000 check:'
             sudo netstat -tlnp | grep 3000 || echo 'Port 3000 not in use'
           
             echo '🧪 Local curl test:'
-            curl -v http://localhost:3000 || echo 'Local connection failed'
-          
-            echo '📁 App directory contents:'
-            ls -la /home/azureuser/app/
-          
-            echo '⚙️ Environment file:'
-            cat /home/azureuser/app/.env.local || echo 'No .env.local file'
+            curl -s http://localhost:3000 | head -5 || echo 'Local connection failed'
           
             echo '🔧 Nginx status:'
-            sudo systemctl status nginx --no-pager -l
+            sudo systemctl status nginx --no-pager -l | head -10
+          
+            echo '⚙️ Nginx configuration test:'
+            sudo nginx -t
           "
           
           echo "🌐 External health check..."
-          if curl -f -s http://${{ secrets.VM_HOST }}; then
-            echo "✅ Application is healthy!"
-          else
-            echo "❌ External health check failed!"
-            echo "ℹ️  Check the diagnostics above for details"
-            exit 1
-          fi
+          for i in {1..3}; do
+            echo "Attempt $i/3..."
+            if curl -f -s --max-time 10 http://${{ secrets.VM_HOST }}; then
+              echo "✅ Application is healthy!"
+              exit 0
+            fi
+            sleep 10
+          done
+          
+          echo "❌ Health check failed after 3 attempts"
+          echo "ℹ️  App may be running but not accessible externally"
+          exit 1
 
       - name: 📝 Deployment summary
         if: always() && github.ref == 'refs/heads/main'
