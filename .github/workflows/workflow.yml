@@ -1,0 +1,141 @@
+# .github/workflows/workflow.yml
+name: Todo App CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+env:
+  NODE_VERSION: '20'
+  APP_PATH: '/home/azureuser/app'
+
+jobs:
+  ci-cd:
+    runs-on: ubuntu-latest
+
+    # PostgreSQL 서비스 (테스트용)
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: testpass
+          POSTGRES_DB: testdb
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+
+    steps:
+      # CI 단계
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+
+      - name: 🟢 Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: 📦 Install dependencies
+        run: npm ci
+
+      - name: 🧪 Setup test database
+        env:
+          DATABASE_URL: postgresql://postgres:testpass@localhost:5432/testdb
+        run: |
+          npx prisma generate
+          npx prisma db push
+
+      - name: ✅ Run tests
+        env:
+          DATABASE_URL: postgresql://postgres:testpass@localhost:5432/testdb
+          NEXTAUTH_SECRET: test-secret
+          NEXTAUTH_URL: http://localhost:3000
+        run: npm test
+
+      - name: 🔨 Build application
+        env:
+          DATABASE_URL: postgresql://postgres:testpass@localhost:5432/testdb
+          NEXTAUTH_SECRET: test-secret
+          NEXTAUTH_URL: http://localhost:3000
+        run: npm run build
+
+      # CD 단계 (main 브랜치만)
+      - name: 🚀 Deploy to Azure VM
+        if: github.ref == 'refs/heads/main'
+        uses: webfactory/ssh-agent@v0.7.0
+        with:
+          ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+
+      - name: 🔧 Add VM to known hosts
+        if: github.ref == 'refs/heads/main'
+        run: |
+          ssh-keyscan -H ${{ secrets.VM_HOST }} >> ~/.ssh/known_hosts
+
+      - name: 📤 Deploy application
+        if: github.ref == 'refs/heads/main'
+        run: |
+          ssh azureuser@${{ secrets.VM_HOST }} "
+            echo '⏹️ Stopping application...'
+            pm2 stop todo-app || true
+            pm2 delete todo-app || true
+          
+            echo '🗑️ Removing old application...'
+            rm -rf $APP_PATH
+          
+            echo '📥 Cloning new version...'
+            git clone https://github.com/soongon/todo-for-devops.git $APP_PATH
+            cd $APP_PATH
+          
+            echo '⚙️ Setting up environment...'
+            cat > .env.local << 'EOL'
+          DATABASE_URL=${{ secrets.DATABASE_URL }}
+          NEXTAUTH_SECRET=${{ secrets.NEXTAUTH_SECRET }}
+          NEXTAUTH_URL=http://${{ secrets.VM_HOST }}:3000
+          NODE_ENV=production
+          EOL
+          
+            echo '📦 Installing dependencies...'
+            npm ci
+          
+            echo '🗄️ Setting up database...'
+            npx prisma generate
+            npx prisma db push
+          
+            echo '🔨 Building application...'
+            npm run build
+          
+            echo '🚀 Starting application...'
+            pm2 start npm --name todo-app -- start
+            pm2 save
+          
+            echo '✅ Deployment completed!'
+          "
+
+      - name: 🏥 Health check
+        if: github.ref == 'refs/heads/main'
+        run: |
+          echo "⏳ Waiting for application to start..."
+          sleep 30
+          
+          echo "🔍 Checking application health..."
+          if curl -f -s http://${{ secrets.VM_HOST }}; then
+            echo "✅ Application is healthy!"
+          else
+            echo "❌ Health check failed!"
+            exit 1
+          fi
+
+      - name: 📝 Deployment summary
+        if: always() && github.ref == 'refs/heads/main'
+        run: |
+          echo "📊 Deployment Summary:"
+          echo "- Repository: ${{ github.repository }}"
+          echo "- Commit: ${{ github.sha }}"
+          echo "- Status: ${{ job.status }}"
+          echo "- App URL: http://${{ secrets.VM_HOST }}"
