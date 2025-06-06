@@ -1,12 +1,10 @@
-# .github/workflows/workflow.yml
-# Next.js CI/CD 파이프라인 (강의용)
+# .github/workflows/deploy.yml
+# Next.js + GitHub Actions + Azure VM 2대 배포 (강의용)
 
 name: Next.js CI/CD Pipeline
 
 on:
   push:
-    branches: [ main ]
-  pull_request:
     branches: [ main ]
 
 env:
@@ -14,18 +12,18 @@ env:
   APP_PATH: '/home/azureuser/app'
 
 jobs:
-  # =================================
-  # 🧪 CI 단계: 빌드 및 테스트
-  # =================================
+  # =======================
+  # 🧪 CI: Build & Test
+  # =======================
   build:
+    name: 🔨 Build & Test
     runs-on: ubuntu-latest
-    name: 🔨 Build and Test
 
     steps:
-      - name: 📥 Checkout code
+      - name: 📅 Checkout code
         uses: actions/checkout@v4
 
-      - name: 🟢 Setup Node.js ${{ env.NODE_VERSION }}
+      - name: ♻️ Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
@@ -35,211 +33,82 @@ jobs:
         run: npm ci
 
       - name: ✅ Run tests
-        env:
-          DATABASE_URL: postgresql://test:test@localhost:5432/testdb
-          NEXTAUTH_SECRET: test-secret
-          NODE_ENV: test
         run: |
-          if npm run | grep -q "test"; then
-            npm test
-          else
-            echo "No tests configured"
-          fi
+          if npm run | grep -q test; then npm test; else echo "No tests defined."; fi
 
-      - name: 🔨 Build application
-        env:
-          DATABASE_URL: postgresql://dummy:dummy@localhost:5432/dummy
-          NEXTAUTH_SECRET: build-time-secret
-          NODE_ENV: production
-        run: |
-          echo "🔨 Starting Next.js build..."
-          echo "📋 Current directory contents:"
-          ls -la
-          
-          echo "📋 Package.json scripts:"
-          cat package.json | grep -A 10 '"scripts"'
-          
-          echo "🚀 Running npm run build..."
-          npm run build
-          
-          echo "📋 Post-build directory contents:"
-          ls -la
-          
-          if [ -d ".next" ]; then
-            echo "✅ .next directory created successfully"
-            echo "📊 Build size: $(du -sh .next | cut -f1)"
-            echo "📋 .next contents:"
-            ls -la .next/
-          else
-            echo "❌ .next directory NOT FOUND!"
-            echo "📋 Checking for build output in other locations:"
-            find . -name "BUILD_ID" -o -name "*.js.map" -o -name "chunks" 2>/dev/null || echo "No build artifacts found"
-            exit 1
-          fi
+      - name: 🔨 Build app
+        run: npm run build
 
-      - name: 📦 Create deployment package
+      - name: 📦 Package app
         run: |
-          echo "📦 Creating complete deployment package with dependencies..."
           mkdir -p deployment-package
-          
-          # 빌드된 Next.js 파일들
-          cp -r .next/ deployment-package/
-          
-          # 런타임 필요 파일들
-          cp package.json deployment-package/
-          cp package-lock.json deployment-package/
-          
-          # 프로덕션 의존성만 설치하여 포함
-          cd deployment-package
-          npm ci --only=production
-          cd ..
-          
-          # 선택적 파일들
-          [ -d "public" ] && cp -r public/ deployment-package/
-          [ -d "prisma" ] && cp -r prisma/ deployment-package/
-          [ -f "next.config.js" ] && cp next.config.js deployment-package/
-          
-          echo "📊 Complete package created:"
-          echo "  Build artifacts: $(du -sh deployment-package/.next | cut -f1)"
-          echo "  Dependencies: $(du -sh deployment-package/node_modules | cut -f1)"
-          echo "  Total size: $(du -sh deployment-package | cut -f1)"
+          cp -r .next/ node_modules/ public/ prisma/ deployment-package/ || true
+          cp package.json package-lock.json next.config.js deployment-package/
 
       - name: 📤 Upload artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: production-build
+          name: app-bundle
           path: deployment-package/
-          retention-days: 7
 
-  # =================================
-  # 🚀 CD 단계: 배포
-  # =================================
+  # =======================
+  # 🚀 CD: Deploy to Azure VM
+  # =======================
   deploy:
-    runs-on: ubuntu-latest
-    name: 🚀 Deploy to Production
+    name: 🚀 Deploy to Azure VM
     needs: build
-    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
 
     steps:
-      - name: 📥 Download artifacts
+      - name: 📥 Download build
         uses: actions/download-artifact@v4
         with:
-          name: production-build
-          path: ./app-bundle/
+          name: app-bundle
+          path: ./app-bundle
 
       - name: 🔐 Setup SSH
         uses: webfactory/ssh-agent@v0.7.0
         with:
           ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
 
-      - name: 🔧 Add known hosts
+      - name: 🛠 Add known hosts
         run: ssh-keyscan -H ${{ secrets.VM_HOST }} >> ~/.ssh/known_hosts
 
-      - name: ⏹️ Stop current application
+      - name: ⏹ Stop old app
+        run: ssh azureuser@${{ secrets.VM_HOST }} "pm2 stop todo-app || true && pm2 delete todo-app || true"
+
+      - name: 🗑 Clean & prepare folder
+        run: ssh azureuser@${{ secrets.VM_HOST }} "rm -rf $APP_PATH && mkdir -p $APP_PATH"
+
+      - name: 📦 Upload app to VM
+        run: scp -r ./app-bundle/* azureuser@${{ secrets.VM_HOST }}:$APP_PATH/
+
+      - name: ⚖️ Setup .env.local
         run: |
           ssh azureuser@${{ secrets.VM_HOST }} "
-            pm2 stop todo-app 2>/dev/null || true
-            pm2 delete todo-app 2>/dev/null || true
+            cd $APP_PATH && \
+            echo 'DATABASE_URL=${{ secrets.DATABASE_URL }}' > .env.local && \
+            echo 'NEXTAUTH_SECRET=${{ secrets.NEXTAUTH_SECRET }}' >> .env.local && \
+            echo 'NEXTAUTH_URL=http://${{ secrets.VM_HOST }}:3000' >> .env.local && \
+            echo 'NODE_ENV=production' >> .env.local
           "
 
-      - name: 🗑️ Backup and cleanup
-        run: |
-          ssh azureuser@${{ secrets.VM_HOST }} "
-            [ -d '$APP_PATH' ] && mv $APP_PATH $APP_PATH.backup.\$(date +%s)
-            mkdir -p $APP_PATH
-          "
+      - name: 📝 Setup Prisma
+        run: ssh azureuser@${{ secrets.VM_HOST }} "cd $APP_PATH && source .env.local && npx prisma generate && npx prisma db push"
 
-      - name: 📦 Deploy new version
-        run: scp -r app-bundle/* azureuser@${{ secrets.VM_HOST }}:$APP_PATH/
+      - name: 🔨 Start app via PM2
+        run: ssh azureuser@${{ secrets.VM_HOST }} "cd $APP_PATH && pm2 start npm --name todo-app -- start && pm2 save"
 
-      - name: ⚙️ Configure environment
+      - name: 🚨 Health check
         run: |
-          ssh azureuser@${{ secrets.VM_HOST }} "
-            cd $APP_PATH
-            cat > .env.local << 'EOF'
-          DATABASE_URL=${{ secrets.DATABASE_URL }}
-          NEXTAUTH_SECRET=${{ secrets.NEXTAUTH_SECRET }}
-          NEXTAUTH_URL=http://${{ secrets.VM_HOST }}:3000
-          NODE_ENV=production
-          EOF
-          "
-
-      - name: 📦 Install production dependencies
-        run: |
-          ssh azureuser@${{ secrets.VM_HOST }} "
-            cd $APP_PATH
-            npm ci --only=production
-          "
-
-      - name: 🗄️ Setup database
-        run: |
-          ssh azureuser@${{ secrets.VM_HOST }} "
-            cd $APP_PATH
-          
-            if [ -f 'prisma/schema.prisma' ]; then
-              echo '🔧 Setting up Prisma database...'
-          
-              # .env.local 파일이 있는지 확인
-              if [ -f '.env.local' ]; then
-                echo '✅ Environment file found'
-          
-                # 환경 변수를 로드하여 Prisma 실행
-                set -a  # 환경 변수 자동 export
-                source .env.local
-                set +a
-          
-                npx prisma generate
-                npx prisma db push
-          
-                echo '✅ Database setup completed'
-              else
-                echo '❌ .env.local file not found'
-                exit 1
-              fi
-            else
-              echo 'ℹ️  No Prisma schema found, skipping database setup'
-            fi
-          "
-
-      - name: 🌐 Configure Nginx
-        run: |
-          ssh azureuser@${{ secrets.VM_HOST }} "
-            sudo tee /etc/nginx/sites-available/todo-app << 'EOF'
-          server {
-              listen 80 default_server;
-              server_name _;
-          
-              location / {
-                  proxy_pass http://localhost:3000;
-                  proxy_set_header Host \$host;
-                  proxy_set_header X-Real-IP \$remote_addr;
-                  proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
-                  proxy_set_header X-Forwarded-Proto \$scheme;
-              }
-          }
-          EOF
-          
-            sudo rm -f /etc/nginx/sites-enabled/default
-            sudo ln -sf /etc/nginx/sites-available/todo-app /etc/nginx/sites-enabled/
-            sudo nginx -t && sudo systemctl reload nginx
-          "
-
-      - name: 🚀 Start application
-        run: |
-          ssh azureuser@${{ secrets.VM_HOST }} "
-            cd $APP_PATH
-            pm2 start npm --name todo-app -- start
-            pm2 save
-          "
-
-      - name: 🏥 Health check
-        run: |
-          sleep 30
-          curl -f http://${{ secrets.VM_HOST }}
-          echo "✅ Deployment successful!"
+          sleep 10
+          if curl -f http://${{ secrets.VM_HOST }}; then
+            echo "✅ App running successfully"
+          else
+            echo "❌ Health check failed"
+            ssh azureuser@${{ secrets.VM_HOST }} "pm2 logs todo-app --lines 50"
+            exit 1
+          fi
 
       - name: 📊 Deployment summary
-        run: |
-          echo "🎉 Deployment completed successfully!"
-          echo "🌐 Application URL: http://${{ secrets.VM_HOST }}"
-          echo "📊 Commit: ${{ github.sha }}"
+        run: echo "🎉 Deployed to http://${{ secrets.VM_HOST }}"
