@@ -56,7 +56,7 @@ jobs:
           cp -r prisma ../deployment-package/
           cp package.json ../deployment-package/
           cp package-lock.json ../deployment-package/
-          cp next.config.js ../deployment-package/
+          cp next.config.mjs ../deployment-package/
 
       - name: 📤 Upload artifacts
         uses: actions/upload-artifact@v4
@@ -97,7 +97,7 @@ jobs:
         run: |
           tar -czf app.tar.gz \
             -C ./app-bundle \
-            .next public prisma package.json package-lock.json next.config.js || echo "⚠️ 일부 파일 누락, 계속 진행"
+            .next public prisma package.json package-lock.json next.config.mjs || echo "⚠️ 일부 파일 누락, 계속 진행"
 
       - name: 📦 Upload app to VM
         run: scp app.tar.gz azureuser@${{ secrets.VM_HOST }}:$APP_PATH/
