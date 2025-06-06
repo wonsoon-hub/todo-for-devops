@@ -49,27 +49,13 @@ jobs:
       - name: 📦 Package app
         run: |
           mkdir -p deployment-package
-
-          # .next 디렉토리는 반드시 복사
           cp -r .next deployment-package/
-          for path in node_modules public prisma; do
-            if [ -e "$path" ]; then
-              echo "📁 Copying $path"
-              cp -r "$path" deployment-package/
-            else
-              echo "⚠️ $path not found, skipping"
-            fi
-          done
-
-          # 파일 복사 (존재할 때만)
-          for file in package.json package-lock.json next.config.js; do
-            if [ -f "$file" ]; then
-              echo "📄 Copying $file"
-              cp "$file" deployment-package/
-            else
-              echo "⚠️ $file not found, skipping"
-            fi
-          done
+          cp -r node_modules deployment-package/
+          cp -r public deployment-package/
+          cp -r prisma deployment-package/
+          cp package.json deployment-package/
+          cp package-lock.json deployment-package/
+          cp next.config.js deployment-package/
 
       - name: 📤 Upload artifacts
         uses: actions/upload-artifact@v4
