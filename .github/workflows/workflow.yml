@@ -32,9 +32,14 @@ jobs:
       - name: 🔨 Build app
         run: |
           mkdir -p app-bundle
-          rsync -av --exclude app-bundle \
-            .next public prisma package.json package-lock.json next.config.mjs .env.local \
-            app-bundle/
+
+          INCLUDE_LIST=""
+          for path in .next public prisma package.json package-lock.json next.config.mjs .env.local; do
+            [ -e "$path" ] && INCLUDE_LIST="$INCLUDE_LIST $path"
+          done
+
+          rsync -av $INCLUDE_LIST app-bundle/
+
           cd app-bundle
           npm ci
           npm run build
