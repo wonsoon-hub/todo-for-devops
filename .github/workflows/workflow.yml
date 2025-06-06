@@ -32,8 +32,9 @@ jobs:
       - name: 🔨 Build app
         run: |
           mkdir -p app-bundle
-          shopt -s extglob
-          cp -r !(app-bundle) app-bundle/
+          rsync -av --exclude app-bundle \
+            .next public prisma package.json package-lock.json next.config.mjs .env.local \
+            app-bundle/
           cd app-bundle
           npm ci
           npm run build
