@@ -134,6 +134,7 @@ jobs:
             echo 'NODE_ENV=production' >> .env.local
           "
 
+
       - name: 📝 Setup Prisma
         run: |
           ssh azureuser@${{ secrets.VM_HOST }} "
@@ -141,6 +142,18 @@ jobs:
             export \$(cat .env.local | xargs) && \
             npx prisma generate && \
             npx prisma db push
+          "
+
+      - name: 🧪 Verify .next folder exists after extract
+        run: |
+          ssh azureuser@${{ secrets.VM_HOST }} "
+            if [ ! -d '$APP_PATH/.next' ]; then
+              echo '❌ .next not found after extraction.'
+              ls -al $APP_PATH
+              exit 1
+            else
+              echo '✅ .next folder found after extraction.'
+            fi
           "
 
       - name: 🔨 Start app via PM2
