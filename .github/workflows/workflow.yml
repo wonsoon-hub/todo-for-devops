@@ -52,20 +52,56 @@ jobs:
           NEXTAUTH_SECRET: build-time-secret
           NODE_ENV: production
         run: |
+          echo "🔨 Starting Next.js build..."
+          echo "📋 Current directory contents:"
+          ls -la
+          
+          echo "📋 Package.json scripts:"
+          cat package.json | grep -A 10 '"scripts"'
+          
+          echo "🚀 Running npm run build..."
           npm run build
-          echo "Build completed: $(du -sh .next | cut -f1)"
+          
+          echo "📋 Post-build directory contents:"
+          ls -la
+          
+          if [ -d ".next" ]; then
+            echo "✅ .next directory created successfully"
+            echo "📊 Build size: $(du -sh .next | cut -f1)"
+            echo "📋 .next contents:"
+            ls -la .next/
+          else
+            echo "❌ .next directory NOT FOUND!"
+            echo "📋 Checking for build output in other locations:"
+            find . -name "BUILD_ID" -o -name "*.js.map" -o -name "chunks" 2>/dev/null || echo "No build artifacts found"
+            exit 1
+          fi
 
       - name: 📦 Create deployment package
         run: |
+          echo "📦 Creating deployment package..."
           mkdir -p deployment-package
+          
+          echo "🔍 Verifying .next directory exists..."
+          if [ ! -d ".next" ]; then
+            echo "❌ FATAL ERROR: .next directory not found!"
+            echo "📋 Available directories:"
+            ls -la
+            exit 1
+          fi
+          
+          echo "✅ Copying build artifacts..."
           cp -r .next/ deployment-package/
           cp package.json deployment-package/
           cp package-lock.json deployment-package/
           
           # Copy optional files
-          [ -d "public" ] && cp -r public/ deployment-package/
-          [ -d "prisma" ] && cp -r prisma/ deployment-package/
-          [ -f "next.config.js" ] && cp next.config.js deployment-package/
+          [ -d "public" ] && cp -r public/ deployment-package/ && echo "✅ public copied"
+          [ -d "prisma" ] && cp -r prisma/ deployment-package/ && echo "✅ prisma copied"
+          [ -f "next.config.js" ] && cp next.config.js deployment-package/ && echo "✅ next.config.js copied"
+          
+          echo "📊 Deployment package created:"
+          ls -la deployment-package/
 
       - name: 📤 Upload artifacts
         uses: actions/upload-artifact@v4
