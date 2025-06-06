@@ -70,7 +70,7 @@ jobs:
             rm deploy.tar.gz # 압축 파일 삭제
             
             # PM2로 애플리케이션 재시작
-            pm2 reload todo-app --name "todo-app" -- start npm -- start || pm2 start npm --name "todo-app" -- start
+            pm2 reload todo-app || pm2 start "npx next start" --name "todo-app"
             pm2 save
             
             echo "🚀 Deployment successful!"
