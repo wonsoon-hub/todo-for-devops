@@ -128,7 +128,16 @@ jobs:
           "
 
       - name: 📝 Setup Prisma
-        run: ssh azureuser@${{ secrets.VM_HOST }} "cd $APP_PATH && source .env.local && npx prisma generate && npx prisma db push"
+        run: |
+          ssh azureuser@${{ secrets.VM_HOST }} "
+            cd $APP_PATH
+
+            # 환경 변수 추출
+            export \$(grep -v '^#' .env.local | xargs)
+
+            npx prisma generate
+            npx prisma db push
+          "
 
       - name: 🔨 Start app via PM2
         run: ssh azureuser@${{ secrets.VM_HOST }} "cd $APP_PATH && pm2 start npm --name todo-app -- start && pm2 save"
