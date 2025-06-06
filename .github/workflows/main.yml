@@ -1,0 +1,72 @@
+# .github/workflows/main.yml
+
+name: Deploy Next.js App to Azure VM
+
+# 1. 워크플로우 실행 조건
+on:
+  push:
+    branches:
+      - main
+
+# 2. 워크플로우 잡(Job) 정의
+jobs:
+  build-and-deploy:
+    name: Build and Deploy
+    runs-on: ubuntu-latest
+
+    # 3. 배포 단계(Steps) 정의
+    steps:
+      # (1) 코드 체크아웃
+      - name: Checkout source code
+        uses: actions/checkout@v4
+
+      # (2) Node.js 환경 설정
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: 'npm'
+
+      # (3) .env 파일 생성 (DB 및 NextAuth 정보)
+      # GitHub Secrets에 저장된 값들을 이용해 .env.local 파일을 생성합니다.
+      - name: Create .env file for build
+        run: |
+          echo "DATABASE_URL=${{ secrets.DATABASE_URL }}" >> .env.local
+          echo "NEXTAUTH_SECRET=${{ secrets.NEXTAUTH_SECRET }}" >> .env.local
+
+      # (4) 의존성 설치 및 애플리케이션 빌드
+      - name: Install dependencies and Build
+        run: |
+          npm install
+          npm run build
+
+      # (5) SCP를 이용한 빌드 결과물 전송
+      # 사용자 Secret 이름(VM_HOST, SSH_PRIVATE_KEY)을 사용하도록 수정했습니다.
+      - name: Transfer build files to Azure VM
+        uses: appleboy/scp-action@master
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: azureuser # Ansible 설정 파일에 명시된 사용자 이름입니다.
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          source: ".next, node_modules, package.json, public"
+          target: "/home/azureuser/app"
+          strip_components: 1
+
+      # (6) SSH를 이용한 원격 배포 스크립트 실행
+      # 사용자 Secret 이름(VM_HOST, SSH_PRIVATE_KEY)을 사용하도록 수정했습니다.
+      - name: Deploy application on Azure VM
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: azureuser # Ansible 설정 파일에 명시된 사용자 이름입니다.
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script: |
+            cd /home/azureuser/app
+            
+            # PM2로 애플리케이션을 중단 없이 재시작합니다.
+            pm2 reload todo-app --name "todo-app" -- start npm -- start || pm2 start npm --name "todo-app" -- start
+
+            # PM2 프로세스 목록을 저장하여 서버 재부팅 후에도 자동 실행되도록 합니다.
+            pm2 save
+
+            echo "🚀 Deployment successful!"
