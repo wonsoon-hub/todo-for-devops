@@ -39,12 +39,20 @@ jobs:
       - name: 🔨 Build app
         run: npm run build
 
+      - name: 🔍 Check if .next folder exists
+        run: |
+          if [ ! -d ".next" ]; then
+            echo "❌ .next folder is missing. Build might have failed."
+            exit 1
+          fi
+
       - name: 📦 Package app
         run: |
           mkdir -p deployment-package
 
-          # 디렉토리 복사 (존재할 때만)
-          for path in .next node_modules public prisma; do
+          # .next 디렉토리는 반드시 복사
+          cp -r .next deployment-package/
+          for path in node_modules public prisma; do
             if [ -e "$path" ]; then
               echo "📁 Copying $path"
               cp -r "$path" deployment-package/
@@ -101,7 +109,6 @@ jobs:
       - name: 📦 Package app
         run: |
           tar -czf app.tar.gz \
-            --exclude='node_modules' \
             -C ./app-bundle \
             .next public prisma package.json package-lock.json next.config.js || echo "⚠️ 일부 파일 누락, 계속 진행"
 
