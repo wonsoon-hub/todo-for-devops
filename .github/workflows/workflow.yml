@@ -53,6 +53,17 @@ jobs:
             exit 1
           fi
 
+      - name: ✅ Ensure .next exists before packaging
+        run: |
+          cd app-bundle/app
+          if [ ! -d ".next" ]; then
+            echo "❌ .next directory is missing before packaging."
+            ls -al
+            exit 1
+          else
+            echo "✅ .next directory confirmed."
+          fi
+
       - name: 📦 Package app
         run: |
           cd app-bundle/app
