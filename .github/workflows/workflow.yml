@@ -132,9 +132,10 @@ jobs:
           ssh azureuser@${{ secrets.VM_HOST }} "
             cd $APP_PATH
 
-            # 환경 변수 추출
-            export \$(grep -v '^#' .env.local | xargs)
-
+            # Prisma 명령 실행 시 .env.local 사용
+            set -a
+            [ -f .env.local ] && . .env.local
+            set +a
             npx prisma generate
             npx prisma db push
           "
