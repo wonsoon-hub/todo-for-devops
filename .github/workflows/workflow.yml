@@ -137,13 +137,9 @@ jobs:
       - name: 📝 Setup Prisma
         run: |
           ssh azureuser@${{ secrets.VM_HOST }} "
-            cd $APP_PATH
-
-            # Prisma 명령 실행 시 .env.local 사용
-            set -a
-            [ -f .env.local ] && . .env.local
-            set +a
-            npx prisma generate
+            cd $APP_PATH && \
+            export \$(cat .env.local | xargs) && \
+            npx prisma generate && \
             npx prisma db push
           "
 
