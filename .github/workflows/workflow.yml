@@ -32,13 +32,14 @@ jobs:
       - name: 🔨 Build app
         run: |
           mkdir -p app-bundle/app
-
-          INCLUDE_LIST=""
-          for path in .next public prisma package.json package-lock.json next.config.mjs .env.local; do
-            [ -e "$path" ] && INCLUDE_LIST="$INCLUDE_LIST $path"
-          done
-
-          rsync -av $INCLUDE_LIST app-bundle/app/
+          
+          # 복사할 디렉토리 및 파일 직접 지정
+          cp -r app app-bundle/app/
+          cp -r public app-bundle/app/
+          cp -r prisma app-bundle/app/
+          cp package.json app-bundle/app/
+          cp package-lock.json app-bundle/app/
+          cp next.config.mjs app-bundle/app/
 
           cd app-bundle/app
           npm ci
