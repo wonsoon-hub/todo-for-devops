@@ -43,7 +43,8 @@ jobs:
         run: |
           mkdir -p deployment-package
           cp -r .next/ node_modules/ public/ prisma/ deployment-package/ || true
-          cp package.json package-lock.json next.config.js deployment-package/
+          cp package.json package-lock.json deployment-package/
+          [ -f next.config.js ] && cp next.config.js deployment-package/
 
       - name: 📤 Upload artifacts
         uses: actions/upload-artifact@v4
