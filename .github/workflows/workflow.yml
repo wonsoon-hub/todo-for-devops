@@ -159,3 +159,10 @@ jobs:
 
       - name: 📊 Deployment summary
         run: echo "🎉 Deployed to http://${{ secrets.VM_HOST }}"
+
+      - name: 🔁 PM2 restart fallback (if not running)
+        run: |
+          ssh azureuser@${{ secrets.VM_HOST }} "
+            cd $APP_PATH && \
+            pm2 describe todo-app > /dev/null || pm2 start npm --name todo-app -- start && pm2 save
+          "
