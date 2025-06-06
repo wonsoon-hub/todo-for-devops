@@ -79,29 +79,30 @@ jobs:
 
       - name: 📦 Create deployment package
         run: |
-          echo "📦 Creating deployment package..."
+          echo "📦 Creating complete deployment package with dependencies..."
           mkdir -p deployment-package
           
-          echo "🔍 Verifying .next directory exists..."
-          if [ ! -d ".next" ]; then
-            echo "❌ FATAL ERROR: .next directory not found!"
-            echo "📋 Available directories:"
-            ls -la
-            exit 1
-          fi
-          
-          echo "✅ Copying build artifacts..."
+          # 빌드된 Next.js 파일들
           cp -r .next/ deployment-package/
+          
+          # 런타임 필요 파일들
           cp package.json deployment-package/
           cp package-lock.json deployment-package/
           
-          # Copy optional files
-          [ -d "public" ] && cp -r public/ deployment-package/ && echo "✅ public copied"
-          [ -d "prisma" ] && cp -r prisma/ deployment-package/ && echo "✅ prisma copied"
-          [ -f "next.config.js" ] && cp next.config.js deployment-package/ && echo "✅ next.config.js copied"
+          # 프로덕션 의존성만 설치하여 포함
+          cd deployment-package
+          npm ci --only=production
+          cd ..
           
-          echo "📊 Deployment package created:"
-          ls -la deployment-package/
+          # 선택적 파일들
+          [ -d "public" ] && cp -r public/ deployment-package/
+          [ -d "prisma" ] && cp -r prisma/ deployment-package/
+          [ -f "next.config.js" ] && cp next.config.js deployment-package/
+          
+          echo "📊 Complete package created:"
+          echo "  Build artifacts: $(du -sh deployment-package/.next | cut -f1)"
+          echo "  Dependencies: $(du -sh deployment-package/node_modules | cut -f1)"
+          echo "  Total size: $(du -sh deployment-package | cut -f1)"
 
       - name: 📤 Upload artifacts
         uses: actions/upload-artifact@v4
