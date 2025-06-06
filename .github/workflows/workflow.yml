@@ -174,7 +174,30 @@ jobs:
         run: |
           ssh azureuser@${{ secrets.VM_HOST }} "
             cd $APP_PATH
-            [ -f 'prisma/schema.prisma' ] && npx prisma generate && npx prisma db push
+          
+            if [ -f 'prisma/schema.prisma' ]; then
+              echo '🔧 Setting up Prisma database...'
+          
+              # .env.local 파일이 있는지 확인
+              if [ -f '.env.local' ]; then
+                echo '✅ Environment file found'
+          
+                # 환경 변수를 로드하여 Prisma 실행
+                set -a  # 환경 변수 자동 export
+                source .env.local
+                set +a
+          
+                npx prisma generate
+                npx prisma db push
+          
+                echo '✅ Database setup completed'
+              else
+                echo '❌ .env.local file not found'
+                exit 1
+              fi
+            else
+              echo 'ℹ️  No Prisma schema found, skipping database setup'
+            fi
           "
 
       - name: 🌐 Configure Nginx
