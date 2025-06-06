@@ -167,3 +167,8 @@ jobs:
             cd $APP_PATH && \
             pm2 describe todo-app > /dev/null || pm2 start npm --name todo-app -- start && pm2 save
           "
+
+      - name: 📌 GitHub Action 배포 마무리 로그
+        run: |
+          echo "✅ GitHub Actions를 통한 배포가 정상적으로 완료되었습니다."
+          echo "📍 접근 URL: http://${{ secrets.VM_HOST }}"
