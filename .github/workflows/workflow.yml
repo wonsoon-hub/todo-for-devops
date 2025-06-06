@@ -98,8 +98,24 @@ jobs:
       - name: 🗑 Clean & prepare folder
         run: ssh azureuser@${{ secrets.VM_HOST }} "rm -rf $APP_PATH && mkdir -p $APP_PATH"
 
+      - name: 📦 Package app
+        run: |
+          tar -czf app.tar.gz \
+            --exclude='node_modules' \
+            -C ./app-bundle \
+            .next public prisma package.json package-lock.json next.config.js || echo "⚠️ 일부 파일 누락, 계속 진행"
+
       - name: 📦 Upload app to VM
-        run: scp -r ./app-bundle/* azureuser@${{ secrets.VM_HOST }}:$APP_PATH/
+        run: scp app.tar.gz azureuser@${{ secrets.VM_HOST }}:$APP_PATH/
+
+      - name: 📦 Extract and install on VM
+        run: |
+          ssh azureuser@${{ secrets.VM_HOST }} "
+            cd $APP_PATH && \
+            tar -xzf app.tar.gz && \
+            rm app.tar.gz && \
+            npm ci --only=production
+          "
 
       - name: ⚖️ Setup .env.local
         run: |
