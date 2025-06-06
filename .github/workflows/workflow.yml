@@ -32,7 +32,8 @@ jobs:
       - name: 🔨 Build app
         run: |
           mkdir -p app-bundle
-          cp -r ./* app-bundle/
+          shopt -s extglob
+          cp -r !(app-bundle) app-bundle/
           cd app-bundle
           npm ci
           npm run build
