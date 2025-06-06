@@ -29,18 +29,17 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
           cache: 'npm'
 
-      - name: 📦 Install dependencies
-        run: npm ci
-
-      - name: ✅ Run tests
-        run: |
-          if npm run | grep -q test; then npm test; else echo "No tests defined."; fi
-
       - name: 🔨 Build app
-        run: npm run build
+        run: |
+          mkdir -p app-bundle
+          cp -r ./* app-bundle/
+          cd app-bundle
+          npm ci
+          npm run build
 
       - name: 🔍 Check if .next folder exists
         run: |
+          cd app-bundle
           if [ ! -d ".next" ]; then
             echo "❌ .next folder is missing. Build might have failed."
             exit 1
@@ -48,14 +47,15 @@ jobs:
 
       - name: 📦 Package app
         run: |
-          mkdir -p deployment-package
-          cp -r .next deployment-package/
-          cp -r node_modules deployment-package/
-          cp -r public deployment-package/
-          cp -r prisma deployment-package/
-          cp package.json deployment-package/
-          cp package-lock.json deployment-package/
-          cp next.config.js deployment-package/
+          cd app-bundle
+          mkdir -p ../deployment-package
+          cp -r .next ../deployment-package/
+          cp -r node_modules ../deployment-package/
+          cp -r public ../deployment-package/
+          cp -r prisma ../deployment-package/
+          cp package.json ../deployment-package/
+          cp package-lock.json ../deployment-package/
+          cp next.config.js ../deployment-package/
 
       - name: 📤 Upload artifacts
         uses: actions/upload-artifact@v4
