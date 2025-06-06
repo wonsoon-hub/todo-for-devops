@@ -13,36 +13,30 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # 1. 코드 체크아웃
       - name: Checkout source code
         uses: actions/checkout@v4
 
-      # 2. Node.js 환경 설정
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: "20"
           cache: 'npm'
 
-      # 3. .env 파일 생성
+      # 'next build'를 위해 .env.local 파일 생성 (이 단계는 여전히 필요)
       - name: Create .env file for build
         run: |
           echo "DATABASE_URL=${{ secrets.DATABASE_URL }}" >> .env.local
           echo "NEXTAUTH_SECRET=${{ secrets.NEXTAUTH_SECRET }}" >> .env.local
 
-      # 4. 의존성 설치 및 빌드
       - name: Install dependencies and Build
         run: |
           npm install
           npm run build
 
-      # 5. 배포용 파일 압축
-      # 실행에 필요한 .next 폴더, node_modules, package.json만 deploy.tar.gz 파일로 압축합니다.
+      # 배포 패키지 압축 (.env.local은 이제 포함하지 않음)
       - name: Create deployment package
-        run: tar -czf deploy.tar.gz .next node_modules package.json .env.local
+        run: tar -czf deploy.tar.gz .next node_modules package.json
 
-      # 6. 압축 파일을 서버로 전송
-      # SCP로 압축 파일 하나만 전송합니다.
       - name: Transfer package to Azure VM
         uses: appleboy/scp-action@master
         with:
@@ -50,32 +44,31 @@ jobs:
           username: azureuser
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           source: "deploy.tar.gz"
-          target: "/home/azureuser" # 홈 디렉토리로 전송
+          target: "/home/azureuser"
 
-      # 7. 서버에서 압축 해제 및 앱 재시작 (이 부분의 script를 교체합니다)
+      # [가장 큰 변경점] SSH 실행 시 환경 변수를 직접 주입
       - name: Deploy application on Azure VM
         uses: appleboy/ssh-action@master
         with:
           host: ${{ secrets.VM_HOST }}
           username: azureuser
           key: ${{ secrets.SSH_PRIVATE_KEY }}
+          # env 키를 통해 GitHub Secrets를 원격 셸의 환경 변수로 전달합니다.
+          env:
+            DATABASE_URL: ${{ secrets.DATABASE_URL }}
+            NEXTAUTH_SECRET: ${{ secrets.NEXTAUTH_SECRET }}
           script: |
-            # 앱 디렉토리로 이동
+            mkdir -p /home/azureuser/app
+            mv /home/azureuser/deploy.tar.gz /home/azureuser/app/
             cd /home/azureuser/app
-            
-            # 압축 해제
             tar -xzf deploy.tar.gz
             rm deploy.tar.gz
-
-            # 1. 기존 앱을 확실하게 중지하고 프로세스 목록에서 삭제합니다.
-            # || true 를 붙여서 앱이 없어서 생기는 오류를 방지합니다.
+            
             pm2 stop todo-app || true
             pm2 delete todo-app || true
 
-            # 2. 올바른 명령어로 새로운 앱을 시작합니다.
+            # ssh-action에 의해 주입된 환경 변수를 그대로 물려받아 앱이 실행됩니다.
             pm2 start "npx next start" --name "todo-app"
 
-            # 3. 현재 프로세스 목록을 저장하여 재부팅 후에도 자동 실행되도록 합니다.
             pm2 save
-            
             echo "🚀 Deployment successful!"
