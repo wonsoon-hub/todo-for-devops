@@ -27,10 +27,14 @@ jobs:
           echo "DATABASE_URL=${{ secrets.DATABASE_URL }}" >> .env.local
           echo "NEXTAUTH_SECRET=${{ secrets.NEXTAUTH_SECRET }}" >> .env.local
 
-      - name: Install dependencies and Build
+      - name: Install dependencies and Test
         run: |
           npm install
-          npm run build
+          npm test
+          npm run lint
+
+      - name: Build Application
+        run: npm run build
 
       - name: Create deployment package
         run: tar -czf deploy.tar.gz .next node_modules package.json
@@ -44,7 +48,6 @@ jobs:
           source: "deploy.tar.gz"
           target: "/home/azureuser"
 
-      # [수정된 부분] YAML 문법 오류를 수정하고, 환경 변수 주입 방식을 변경했습니다.
       - name: Deploy application on Azure VM
         uses: appleboy/ssh-action@master
         with:
