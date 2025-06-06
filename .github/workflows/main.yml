@@ -22,7 +22,6 @@ jobs:
           node-version: "20"
           cache: 'npm'
 
-      # 'next build'를 위해 .env.local 파일 생성 (이 단계는 여전히 필요)
       - name: Create .env file for build
         run: |
           echo "DATABASE_URL=${{ secrets.DATABASE_URL }}" >> .env.local
@@ -33,7 +32,6 @@ jobs:
           npm install
           npm run build
 
-      # 배포 패키지 압축 (.env.local은 이제 포함하지 않음)
       - name: Create deployment package
         run: tar -czf deploy.tar.gz .next node_modules package.json
 
@@ -46,17 +44,13 @@ jobs:
           source: "deploy.tar.gz"
           target: "/home/azureuser"
 
-      # [가장 큰 변경점] SSH 실행 시 환경 변수를 직접 주입
+      # [수정된 부분] YAML 문법 오류를 수정하고, 환경 변수 주입 방식을 변경했습니다.
       - name: Deploy application on Azure VM
         uses: appleboy/ssh-action@master
         with:
           host: ${{ secrets.VM_HOST }}
           username: azureuser
           key: ${{ secrets.SSH_PRIVATE_KEY }}
-          # env 키를 통해 GitHub Secrets를 원격 셸의 환경 변수로 전달합니다.
-          env:
-            DATABASE_URL: ${{ secrets.DATABASE_URL }}
-            NEXTAUTH_SECRET: ${{ secrets.NEXTAUTH_SECRET }}
           script: |
             mkdir -p /home/azureuser/app
             mv /home/azureuser/deploy.tar.gz /home/azureuser/app/
@@ -67,8 +61,8 @@ jobs:
             pm2 stop todo-app || true
             pm2 delete todo-app || true
 
-            # ssh-action에 의해 주입된 환경 변수를 그대로 물려받아 앱이 실행됩니다.
-            pm2 start "npx next start" --name "todo-app"
+            # pm2 start 명령어 한 줄에 환경변수를 직접 주입하여 실행합니다.
+            DATABASE_URL='${{ secrets.DATABASE_URL }}' NEXTAUTH_SECRET='${{ secrets.NEXTAUTH_SECRET }}' pm2 start "npx next start" --name "todo-app"
 
             pm2 save
             echo "🚀 Deployment successful!"
