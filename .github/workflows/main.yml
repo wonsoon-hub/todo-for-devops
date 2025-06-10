@@ -30,41 +30,43 @@ jobs:
       - name: Install dependencies and Test
         run: |
           npm install
-          npm test
+          npm run lint
+          npm run test
 
       - name: Build Application
         run: npm run build
 
       - name: Create deployment package
         run: tar -czf deploy.tar.gz .next node_modules package.json
+          echo 'CI까지 완성... CD는 나중에..'
 
-      - name: Transfer package to Azure VM
-        uses: appleboy/scp-action@master
-        with:
-          host: ${{ secrets.VM_HOST }}
-          username: azureuser
-          key: ${{ secrets.SSH_PRIVATE_KEY }}
-          source: "deploy.tar.gz"
-          target: "/home/azureuser"
-
-      - name: Deploy application on Azure VM
-        uses: appleboy/ssh-action@master
-        with:
-          host: ${{ secrets.VM_HOST }}
-          username: azureuser
-          key: ${{ secrets.SSH_PRIVATE_KEY }}
-          script: |
-            mkdir -p /home/azureuser/app
-            mv /home/azureuser/deploy.tar.gz /home/azureuser/app/
-            cd /home/azureuser/app
-            tar -xzf deploy.tar.gz
-            rm deploy.tar.gz
-            
-            pm2 stop todo-app || true
-            pm2 delete todo-app || true
-
-            # pm2 start 명령어 한 줄에 환경변수를 직접 주입하여 실행합니다.
-            DATABASE_URL='${{ secrets.DATABASE_URL }}' NEXTAUTH_SECRET='${{ secrets.NEXTAUTH_SECRET }}' pm2 start "npx next start" --name "todo-app"
-
-            pm2 save
-            echo "🚀 Deployment successful!"
+#      - name: Transfer package to Azure VM
+#        uses: appleboy/scp-action@master
+#        with:
+#          host: ${{ secrets.VM_HOST }}
+#          username: azureuser
+#          key: ${{ secrets.SSH_PRIVATE_KEY }}
+#          source: "deploy.tar.gz"
+#          target: "/home/azureuser"
+#
+#      - name: Deploy application on Azure VM
+#        uses: appleboy/ssh-action@master
+#        with:
+#          host: ${{ secrets.VM_HOST }}
+#          username: azureuser
+#          key: ${{ secrets.SSH_PRIVATE_KEY }}
+#          script: |
+#            mkdir -p /home/azureuser/app
+#            mv /home/azureuser/deploy.tar.gz /home/azureuser/app/
+#            cd /home/azureuser/app
+#            tar -xzf deploy.tar.gz
+#            rm deploy.tar.gz
+#
+#            pm2 stop todo-app || true
+#            pm2 delete todo-app || true
+#
+#            # pm2 start 명령어 한 줄에 환경변수를 직접 주입하여 실행합니다.
+#            DATABASE_URL='${{ secrets.DATABASE_URL }}' NEXTAUTH_SECRET='${{ secrets.NEXTAUTH_SECRET }}' pm2 start "npx next start" --name "todo-app"
+#
+#            pm2 save
+#            echo "🚀 Deployment successful!"
