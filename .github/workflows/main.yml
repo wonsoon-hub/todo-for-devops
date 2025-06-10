@@ -4,7 +4,7 @@ name: 🚀 Deploy Next.js App with Docker
 on:
   push:
     branches:
-      - docker-ci-cd-03
+      - main
 
 jobs:
   deploy:
