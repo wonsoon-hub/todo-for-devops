@@ -50,7 +50,7 @@ export default function Home() {
 
   return (
     <main style={{ maxWidth: 600, margin: '60px auto', fontFamily: 'Segoe UI, sans-serif', padding: 24, background: '#f9f9f9', borderRadius: 12, boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}>
-      <h1 style={{ textAlign: 'center', fontSize: 32, marginBottom: 30, color: '#333' }}>📝 DevOps 실습용 Node 앱 -교육-docker 수정</h1>
+      <h1 style={{ textAlign: 'center', fontSize: 32, marginBottom: 30, color: '#333' }}>📝 DevOps 실습용 Node 앱 -교육-docker 수정 2</h1>
 
       <div style={{ display: 'flex', gap: 10, marginBottom: 24 }}>
         <input
