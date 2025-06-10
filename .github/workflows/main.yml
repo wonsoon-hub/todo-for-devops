@@ -25,7 +25,7 @@ jobs:
 
       - name: 📤 Push Docker Image
         run: |
-          docker push ${{ secrets.DOCKER_USERNAME }}/todo-app
+          docker push ${{ secrets.DOCKER_USERNAME }}/todo-app:latest
 
 #      - name: 🚀 Deploy via SSH (Pull & Restart)
 #        uses: appleboy/ssh-action@v0.1.10
