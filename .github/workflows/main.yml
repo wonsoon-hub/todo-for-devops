@@ -24,44 +24,44 @@ jobs:
           docker build -t ${{ secrets.DOCKER_USERNAME }}/todo-app .
           docker push ${{ secrets.DOCKER_USERNAME }}/todo-app
 
-#      - name: 🔐 Azure CLI login
-#        uses: azure/login@v1
-#        with:
-#          creds: ${{ secrets.AZURE_CREDENTIALS }}
-#
-#      - name: 🛠 Create Web App (if not exists)
-#        run: |
-#          if ! az webapp show --name todo-webapp-dev --resource-group rg-appservice-infrastructure-dev-04 &> /dev/null; then
-#            az webapp create \
-#              --resource-group rg-appservice-infrastructure-dev-04 \
-#              --plan asp-dev \
-#              --name todo-webapp-dev
-#
-#            # 바로 컨테이너 설정
-#            az webapp config container set \
-#              --name todo-webapp-dev \
-#              --resource-group rg-appservice-infrastructure-dev-04 \
-#              --docker-custom-image-name ${{ secrets.DOCKER_USERNAME }}/todo-next-app:latest \
-#              --docker-registry-server-url https://index.docker.io
-#          fi
-#
-#      - name: ⚙️ Set App Service port setting
-#        run: |
-#          az webapp config appsettings set \
-#            --name todo-webapp-dev \
-#            --resource-group rg-appservice-infrastructure-dev-04 \
-#            --settings WEBSITES_PORT=3000
-#
-#      - name: 🚀 Configure App Service to use Docker Hub
-#        run: |
-#          az webapp config container set \
-#            --name todo-webapp-dev \
-#            --resource-group rg-appservice-infrastructure-dev-04 \
-#            --container-image-name ${{ secrets.DOCKER_USERNAME }}/todo-next-app:latest \
-#            --container-registry-url https://index.docker.io
-#
-#      - name: 🔁 Restart App Service
-#        run: |
-#          az webapp restart \
-#            --name todo-webapp-dev \
-#            --resource-group rg-appservice-infrastructure-dev-04
+      - name: 🔐 Azure CLI login
+        uses: azure/login@v1
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: 🛠 Create Web App (if not exists)
+        run: |
+          if ! az webapp show --name todo-webapp-dev --resource-group rg-appservice-infrastructure-dev-04 &> /dev/null; then
+            az webapp create \
+              --resource-group rg-appservice-infrastructure-dev-04 \
+              --plan asp-dev \
+              --name todo-webapp-dev
+
+            # 바로 컨테이너 설정
+            az webapp config container set \
+              --name todo-webapp-dev \
+              --resource-group rg-appservice-infrastructure-dev-04 \
+              --docker-custom-image-name ${{ secrets.DOCKER_USERNAME }}/todo-app \
+              --docker-registry-server-url https://index.docker.io
+          fi
+
+      - name: ⚙️ Set App Service port setting
+        run: |
+          az webapp config appsettings set \
+            --name todo-webapp-dev \
+            --resource-group rg-appservice-infrastructure-dev-04 \
+            --settings WEBSITES_PORT=3000
+
+      - name: 🚀 Configure App Service to use Docker Hub
+        run: |
+          az webapp config container set \
+            --name todo-webapp-dev \
+            --resource-group rg-appservice-infrastructure-dev-04 \
+            --container-image-name ${{ secrets.DOCKER_USERNAME }}/todo-app \
+            --container-registry-url https://index.docker.io
+
+      - name: 🔁 Restart App Service
+        run: |
+          az webapp restart \
+            --name todo-webapp-dev \
+            --resource-group rg-appservice-infrastructure-dev-04
